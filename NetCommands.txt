@@ -1,0 +1,53 @@
+To Server:
+    pa x,y,w,h
+    pa0,0,10,10
+        Sends all paddleInformation
+    p x,y
+    p10,10
+        Sends just the coords of the paddle
+    f
+        Finds a game to play in
+    c~
+        Gets the client information
+
+To Client:
+    Client Elements:
+        c CID,PID~
+        c0,0
+            client information, first number is client id
+            second number is the client paddle id
+        
+    Game Elements:
+        b x,y
+        b10,10
+            Sends the ball coords
+        ba x,y,w,h
+        ba10,10,10,10
+            Sends all the ball information
+        cd t
+        cd5
+            Count down from 5 seconds
+
+        go
+            The game has started
+
+        p clientId, x, y
+        p0,5,10
+            Sends paddle position of client id
+
+        g gameId, Screen Side, opPlayerId
+        g0,1,1
+            Sends the game information after the clients asks to find a game
+
+        e
+            The other player has left the game
+
+        w
+            The current wins
+        
+        l
+            The current player looses
+            
+
+        
+    
