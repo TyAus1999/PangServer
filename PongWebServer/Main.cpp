@@ -76,7 +76,7 @@ game initGame(player p1, player p2, u64 gameId) {
     outBall.timeOfLastMove = getCurrentTimeMS();
 
     p1.p.x = -8.0;
-    p1.p.y = .0;
+    p1.p.y = 0.0;
 
     p2.p.x = 8.0;
     p2.p.y = 0.0;
@@ -197,6 +197,27 @@ void clientMessage(connection_hdl hdl, server::message_ptr msg) {
             y = temp.substr(commaIndex + 1, temp.size());
             players[playerIndex].p.x = stod(x);
             players[playerIndex].p.y = stod(y);
+            player* currentP = &players[playerIndex];
+            if (players[playerIndex].currentGame > 0) {
+                lockMutex(&gameMutex);
+                for (int i = 0; i < games.size(); i++) {
+                    if (players[playerIndex].currentGame == games[i].gameId) {
+                        game* currentGame = &games[i];
+                        if (currentGame->p1.playerId == currentP->playerId) {
+                            paddle* wp = &currentGame->p1.p;
+                            wp->x = currentP->p.x;
+                            wp->y = currentP->p.y;
+                        }
+                        else if (currentGame->p2.playerId == currentP->playerId) {
+                            paddle* wp = &currentGame->p2.p;
+                            wp->x = currentP->p.x;
+                            wp->y = currentP->p.y;
+                        }
+                        break;
+                    }
+                }
+                gameMutex.unlock();
+            }
             //start a thread to send to all the players in the current game this player is in
             string toOtherPlayers = "p";
             toOtherPlayers.append(to_string(players[playerIndex].playerId));
@@ -262,13 +283,11 @@ void console() {
 }
 
 bool isTouchingPaddle(paddle* p, ball* b) {
-    if (p->x < 0) {//left side
-        
-    }
-    else {//right side
-
-    }
-
+    double xDistance = abs(b->x - p->x);
+    double yDistance = abs(b->y - p->y);
+    //cout << "xDistance: " << xDistance << "\tyDistance: " << yDistance << endl;
+    if (xDistance < minDistanceX && yDistance < minDistanceY)
+        return true;
     return false;
 }
 
@@ -330,55 +349,6 @@ void gameLogic() {
                     currentBall->xVel *= -1;
                     currentBall->x += currentBall->xVel+(currentBall->xVel*0.1);
                 }
-                //Check for player 1
-                //else if (currentBall->x - ballDiameter - hPaddleWidth < p1Paddle->x) {
-                //    //X is true
-                //    /*cout << "Player 1" << endl;
-                //    currentBall->xVel *= -1;
-                //    currentBall->x += currentBall->xVel;*/
-                //    //Check for Y
-                //    //double subY = currentBall->y - p1Paddle->y;
-                //    //if (subY < 0)
-                //    //    subY *= -1;
-                //    //if (subY > ballDiameter + hPaddleHeight) {
-                //    //    //cout << "Player 1" << endl;
-                //    //    currentBall->xVel *= -1;
-                //    //    currentBall->x += currentBall->xVel;
-                //    //}
-                //    double ballPlus = currentBall->y + ballDiameter;
-                //    double ballMinus = currentBall->y - ballDiameter;
-                //    double paddlePlus = p1Paddle->y + hPaddleHeight;
-                //    double paddleMinus = p1Paddle->y - hPaddleHeight;
-                //    if (ballPlus < paddlePlus || ballMinus < paddlePlus || ballMinus<paddleMinus || ballPlus>paddleMinus) {
-                //        cout << "Hit" << endl;
-                //        currentBall->xVel *= -1;
-                //        currentBall->x += currentBall->xVel+(currentBall->xVel*0.1);
-                //    }
-                //    /*else if (ballPlus < paddlePlus && ballMinus < paddleMinus) {
-                //        cout << "Hit" << endl;
-                //        currentBall->xVel *= -1;
-                //        currentBall->x += currentBall->xVel + (currentBall->xVel * 0.1);
-                //    }*/
-
-                //}
-                ////Check for player 2
-                //else if (currentBall->x + ballDiameter + hPaddleWidth > p2Paddle->x) {
-                //    //X is true
-                //    double ballPlus = currentBall->y + ballDiameter;
-                //    double ballMinus = currentBall->y - ballDiameter;
-                //    double paddlePlus = p2Paddle->y + hPaddleHeight;
-                //    double paddleMinus = p2Paddle->y - hPaddleHeight;
-                //    if (ballPlus < paddlePlus || ballMinus < paddlePlus || ballMinus<paddleMinus || ballPlus>paddleMinus) {
-                //        cout << "Hit" << endl;
-                //        currentBall->xVel *= -1;
-                //        currentBall->x += currentBall->xVel + (currentBall->xVel * 0.1);
-                //    }
-                //    /*else if (ballPlus < paddlePlus && ballMinus < paddleMinus) {
-                //        cout << "Hit" << endl;
-                //        currentBall->xVel *= -1;
-                //        currentBall->x += currentBall->xVel + (currentBall->xVel * 0.1);
-                //    }*/
-                //}
 
                 string ballUpdate = "b";
                 ballUpdate.append(to_string(currentBall->x));
