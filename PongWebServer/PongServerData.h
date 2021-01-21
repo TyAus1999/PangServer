@@ -34,6 +34,8 @@ struct game {
 	u64 gameId;
 	player p1;
 	player p2;
+	paddle* p1Paddle;
+	paddle* p2Paddle;
 	ball b;
 
 	u64 player1Score;

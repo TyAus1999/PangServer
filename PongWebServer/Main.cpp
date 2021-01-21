@@ -17,87 +17,11 @@ vector<string> sendToAll;
 mutex findGameMutex;
 vector<u64> playerIdFindGameQueue;
 
-u64 getCurrentTimeMS() {
-    u64 out = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
-    return out;
-}
+
 
 void lockMutex(mutex* m) {
     while (!m->try_lock())
         this_thread::sleep_for(chrono::milliseconds(5));
-}
-
-bool equalHDL(connection_hdl a, connection_hdl b) {
-    return !a.owner_before(b) && !b.owner_before(a);
-}
-
-//Locks mutex but does not unlock the mutex
-int getPlayerIndex(connection_hdl hdl) {
-    lockMutex(&playerMutex);
-    //Need to make this a multithreaded search
-    for (int i = 0; i < players.size(); i++) {
-        if (equalHDL(players[i].hdl, hdl))
-            return i;
-    }
-    return -1;
-}
-
-//Does not lock
-u64 getUnusedGameID() {
-    u64 largestId = 0;
-    for (int i = 0; i < games.size(); i++) {
-        if (games[i].gameId > largestId)
-            largestId = games[i].gameId;
-    }
-    largestId++;
-    return largestId;
-}
-
-game initGame(player p1, player p2, u64 gameId) {
-    game out;
-    ball outBall;
-    outBall.x = 0;
-    outBall.y = 0;
-    outBall.xVel = ((double)((rand() % 3) + 1)) / 10.0;
-    outBall.yVel = ((double)((rand() % 3) + 1)) / 10.0;
-    if (outBall.xVel == outBall.yVel) {
-        int r = rand() % 2;
-        if (r) {
-            if (outBall.xVel - 0.1 == 0.0)outBall.xVel -= 0.2;
-            else outBall.xVel -= 0.1;
-        }
-        else {
-            if (outBall.yVel - 0.1 == 0.0)outBall.yVel -= 0.2;
-            else outBall.yVel -= 0.1;
-        }
-    }
-    outBall.width = ballDiameter;
-    outBall.height = ballDiameter;
-    outBall.timeOfLastMove = getCurrentTimeMS();
-
-    p1.p.x = -8.0;
-    p1.p.y = 0.0;
-
-    p2.p.x = 8.0;
-    p2.p.y = 0.0;
-
-    out.gameId = gameId;
-    out.p1 = p1;
-    out.p2 = p2;
-    out.b = outBall;
-    out.player1Score = 0;
-    out.player2Score = 0;
-
-    return out;
-}
-
-//Does not lock
-int getGameIndex(u64 gameId) {
-    for (int i = 0; i < games.size(); i++) {
-        if (games[i].gameId == gameId)
-            return i;
-    }
-    return -1;
 }
 
 //appends to the send all vector
@@ -105,20 +29,6 @@ void appendSendAll(string s) {
     lockMutex(&sendToAllMutex);
     sendToAll.push_back(s);
     sendToAllMutex.unlock();
-}
-
-//Not locked, must lock players vector before using this
-int getIndexOfPlayerId(u64* playerId, u64 amount, int* indexs) {
-    int currIndex = 0;
-    for (int i = 0; i < players.size(); i++) {
-        for (u64 p = 0; p < amount; p++) {
-            if (players[i].playerId == playerId[p]) {
-                indexs[currIndex] = i;
-                currIndex++;
-            }
-        }
-    }
-    return currIndex;
 }
 
 void incomingClient(connection_hdl hdl) {
@@ -149,7 +59,7 @@ void leavingClient(connection_hdl hdl) {
             player* currentPlayer = &players[i];
             if (currentPlayer->currentGame > 0) {
                 lockMutex(&gameMutex);
-                int gameIndex = getGameIndex(currentPlayer->currentGame);
+                int gameIndex = getGameIndex(currentPlayer->currentGame, &games);
                 if (gameIndex == -1) {
                     players.erase(players.begin() + i);
                     gameMutex.unlock();
@@ -177,7 +87,8 @@ void leavingClient(connection_hdl hdl) {
 void clientMessage(connection_hdl hdl, server::message_ptr msg) {
     string temp = msg->get_payload();
     //cout << "Message from the client: " << temp << endl;
-    int playerIndex = getPlayerIndex(hdl);
+    lockMutex(&playerMutex);
+    int playerIndex = getPlayerIndex(hdl, &players);
     //Might need to make a thread to deal with incoming instead
     //Start a thread when the information comes in and hand off the hdl and the msg pointer
     //TODO:
@@ -282,15 +193,6 @@ void console() {
     }
 }
 
-bool isTouchingPaddle(paddle* p, ball* b) {
-    double xDistance = abs(b->x - p->x);
-    double yDistance = abs(b->y - p->y);
-    //cout << "xDistance: " << xDistance << "\tyDistance: " << yDistance << endl;
-    if (xDistance < minDistanceX && yDistance < minDistanceY)
-        return true;
-    return false;
-}
-
 void gameLogic() {
     while (isServerRunning) {
         lockMutex(&gameMutex);
@@ -371,10 +273,10 @@ void gameLogic() {
                 int pIDs[2];
                 lockMutex(&playerMutex);
                 lockMutex(&gameMutex);
-                int written = getIndexOfPlayerId(playerIds, 2, pIDs);
+                int written = getIndexOfPlayerId(playerIds, 2, pIDs, &players);
                 //cout << "Written: " << written << endl;
-                u64 gameId = getUnusedGameID();
-                game toAdd = initGame(players[pIDs[0]], players[pIDs[1]], gameId);
+                u64 gameId = getUnusedGameId(&games);
+                game toAdd = initGame(&players[pIDs[0]], &players[pIDs[1]], gameId);
                 players[pIDs[0]].currentGame = gameId;
                 players[pIDs[1]].currentGame = gameId;
                 string toP1 = "g";

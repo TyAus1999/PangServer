@@ -152,13 +152,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="ballFunctions.h" />
+    <ClInclude Include="gameFunctions.h" />
     <ClInclude Include="inc.h" />
     <ClInclude Include="PaddleFunctions.h" />
     <ClInclude Include="PongServerData.h" />
+    <ClInclude Include="vectorFunctions.h" />
     <ClInclude Include="WebsocketStuff.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="playerFunctions.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

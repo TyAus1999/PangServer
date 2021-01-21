@@ -27,10 +27,24 @@
     <ClInclude Include="PaddleFunctions.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="gameFunctions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ballFunctions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vectorFunctions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="playerFunctions.h">
+      <Filter>Header Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
