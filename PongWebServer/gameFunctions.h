@@ -11,6 +11,8 @@ game initGame(player* p1, player* p2, u64 gameId) {
 	out.gameId = gameId;
 	out.p1Paddle = &p1->p;
 	out.p2Paddle = &p2->p;
+	out.player1Id = p1->playerId;
+	out.player2Id = p2->playerId;
 	out.b = initBall();
 	out.player1Score = 0;
 	out.player2Score = 0;

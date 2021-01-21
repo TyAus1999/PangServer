@@ -2,7 +2,6 @@
 #include "inc.h"
 
 typedef unsigned long long u64;
-using namespace std;
 
 struct ball {
 	u64 gameId;
@@ -36,6 +35,8 @@ struct game {
 	player p2;
 	paddle* p1Paddle;
 	paddle* p2Paddle;
+	u64 player1Id;
+	u64 player2Id;
 	ball b;
 
 	u64 player1Score;

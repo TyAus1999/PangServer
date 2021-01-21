@@ -33,19 +33,8 @@ void appendSendAll(string s) {
 
 void incomingClient(connection_hdl hdl) {
     cout << "Client Connected" << endl;
-    player p;
-    memset(&p, 0, sizeof(player));
-    p.hdl = hdl;
     lockMutex(&playerMutex);
-    u64 largestIndex = 0;
-    for (u64 i = 0; i < players.size(); i++) {
-        if (players[i].playerId > largestIndex) {
-            largestIndex = players[i].playerId;
-        }
-    }
-    if (players.size() > 0)
-        largestIndex++;
-    p.playerId = largestIndex;
+    player p = initPlayer(hdl, &players);
     players.push_back(p);
     playerMutex.unlock();
 }
@@ -86,7 +75,7 @@ void leavingClient(connection_hdl hdl) {
 }
 void clientMessage(connection_hdl hdl, server::message_ptr msg) {
     string temp = msg->get_payload();
-    //cout << "Message from the client: " << temp << endl;
+    cout << "Message from the client: " << temp << endl;
     lockMutex(&playerMutex);
     int playerIndex = getPlayerIndex(hdl, &players);
     //Might need to make a thread to deal with incoming instead
@@ -108,27 +97,6 @@ void clientMessage(connection_hdl hdl, server::message_ptr msg) {
             y = temp.substr(commaIndex + 1, temp.size());
             players[playerIndex].p.x = stod(x);
             players[playerIndex].p.y = stod(y);
-            player* currentP = &players[playerIndex];
-            if (players[playerIndex].currentGame > 0) {
-                lockMutex(&gameMutex);
-                for (int i = 0; i < games.size(); i++) {
-                    if (players[playerIndex].currentGame == games[i].gameId) {
-                        game* currentGame = &games[i];
-                        if (currentGame->p1.playerId == currentP->playerId) {
-                            paddle* wp = &currentGame->p1.p;
-                            wp->x = currentP->p.x;
-                            wp->y = currentP->p.y;
-                        }
-                        else if (currentGame->p2.playerId == currentP->playerId) {
-                            paddle* wp = &currentGame->p2.p;
-                            wp->x = currentP->p.x;
-                            wp->y = currentP->p.y;
-                        }
-                        break;
-                    }
-                }
-                gameMutex.unlock();
-            }
             //start a thread to send to all the players in the current game this player is in
             string toOtherPlayers = "p";
             toOtherPlayers.append(to_string(players[playerIndex].playerId));
@@ -140,8 +108,6 @@ void clientMessage(connection_hdl hdl, server::message_ptr msg) {
                 if (i != playerIndex)
                     s.sendData(players[i].hdl, toOtherPlayers);
             }
-            //cout << toOtherPlayers << "\n\tWas not sent to player "
-                //<< to_string(players[playerIndex].playerId) << endl;
         }
     }
     else if (temp == "f") {//find a game
@@ -196,70 +162,68 @@ void console() {
 void gameLogic() {
     while (isServerRunning) {
         lockMutex(&gameMutex);
-        u64 currentTime = getCurrentTimeMS();
+        lockMutex(&playerMutex);
         for (int i = 0; i < games.size(); i++) {
+            u64 currentTime = getCurrentTimeMS();
             ball* currentBall = &games[i].b;
             game* currentGame = &games[i];
-            paddle* p1Paddle = &games[i].p1.p;
-            paddle* p2Paddle = &games[i].p2.p;
             if (currentTime - currentBall->timeOfLastMove > 16) {
                 currentBall->timeOfLastMove = currentTime;
                 currentBall->x += currentBall->xVel;
                 currentBall->y += currentBall->yVel;
+                u64 pIds[2];
+                pIds[0] = currentGame->player1Id;
+                pIds[1] = currentGame->player2Id;
+                int playerIndexs[2];
+                int amount = getIndexOfPlayerId(pIds, 2, playerIndexs, &players);
+                if (amount == 2) {
+                    u64 currentTime = getCurrentTimeMS();
+                    player* p1=&players[playerIndexs[0]];
+                    player* p2=&players[playerIndexs[1]];
+                    paddle* p1Paddle = &p1->p;
+                    paddle* p2Paddle = &p2->p;
+                    //check for each of the paddles
+                    //Paddle origin is centre
+                    bool touchingP1 = isTouchingPaddle(p1Paddle, currentBall);
+                    bool touchingP2 = isTouchingPaddle(p2Paddle, currentBall);
 
-                //check for each of the paddles
-                //Paddle origin is centre
-                bool touchingP1 = isTouchingPaddle(p1Paddle,currentBall);
-                bool touchingP2 = isTouchingPaddle(p2Paddle, currentBall);
-                /*double minusX = abs(currentGame->p1.p.x - currentBall->x);
-                double minusY = abs(currentGame->p1.p.y - currentBall->y);
-                if (minusX < minDistanceX) {
-                    touchingP1 = true;
+                    //check for the bounds
+                    if (currentBall->x < -16) {//Player 1 Looses round
+                        s.sendData(currentGame->p1.hdl, "w");
+                        s.sendData(currentGame->p2.hdl, "l");
+                        currentBall->y = 0;
+                        currentBall->x = 0;
+                        //cout << "Player 1 Loses" << endl;
+                    }
+                    else if (currentBall->x > 16) {//Player 2 looses round
+                        s.sendData(currentGame->p1.hdl, "l");
+                        s.sendData(currentGame->p2.hdl, "w");
+                        currentBall->x = 0;
+                        currentBall->y = 0;
+                        //cout << "Player 2 Loses" << endl;
+                    }
+                    else if (currentBall->y < -7) {//Ball hit the ceil
+                        currentBall->y = -7.0;
+                        currentBall->yVel *= -1.0;
+                    }
+                    else if (currentBall->y > 7) {//Ball hit floor
+                        currentBall->y = 7.0;
+                        currentBall->yVel *= -1.0;
+                    }
+                    else if (touchingP1 || touchingP2) {
+                        currentBall->xVel *= -1;
+                        currentBall->x += currentBall->xVel + (currentBall->xVel * 0.1);
+                    }
+                    string ballUpdate = "b";
+                    ballUpdate.append(to_string(currentBall->x));
+                    ballUpdate.append(",");
+                    ballUpdate.append(to_string(currentBall->y));
+                    s.sendData(p1->hdl, ballUpdate);
+                    s.sendData(p2->hdl, ballUpdate);
                 }
-                minusX = abs(currentGame->p2.p.x - currentBall->x);
-                minusY = abs(currentGame->p2.p.y - currentBall->y);
-                if (minusX < minDistanceX) {
-                    cout << "Touching player 2" << endl;
-                    cout << "MinusY: " << minusY << "\tminDistanceY: " << minDistanceY << "\tbool: " << (minusY < minDistanceY) << endl;
-                        touchingP2 = true;
-                }*/
-
-                //check for the bounds
-                if (currentBall->x < -16) {//Player 1 Looses round
-                    s.sendData(currentGame->p1.hdl, "w");
-                    s.sendData(currentGame->p2.hdl, "l");
-                    currentBall->y = 0;
-                    currentBall->x = 0;
-                    //cout << "Player 1 Loses" << endl;
-                }
-                else if (currentBall->x > 16) {//Player 2 looses round
-                    s.sendData(currentGame->p1.hdl, "l");
-                    s.sendData(currentGame->p2.hdl, "w");
-                    currentBall->x = 0;
-                    currentBall->y = 0;
-                    //cout << "Player 2 Loses" << endl;
-                }
-                else if (currentBall->y < -7) {//Ball hit the ceil
-                    currentBall->y = -7.0;
-                    currentBall->yVel *= -1.0;
-                }
-                else if (currentBall->y > 7) {//Ball hit floor
-                    currentBall->y = 7.0;
-                    currentBall->yVel *= -1.0;
-                }
-                else if (touchingP1 || touchingP2) {
-                    currentBall->xVel *= -1;
-                    currentBall->x += currentBall->xVel+(currentBall->xVel*0.1);
-                }
-
-                string ballUpdate = "b";
-                ballUpdate.append(to_string(currentBall->x));
-                ballUpdate.append(",");
-                ballUpdate.append(to_string(currentBall->y));
-                s.sendData(currentGame->p1.hdl, ballUpdate);
-                s.sendData(currentGame->p2.hdl, ballUpdate);
             }
         }
+        playerMutex.unlock();
         gameMutex.unlock();
 
         //This should be it's own thread
@@ -308,7 +272,6 @@ int main() {
     isServerRunning = true;
     thread incomingThread([]() {s.run(1666); });
     thread gameLogicThread(gameLogic);
-    //s.run(80);
     printf("Server Is Started\n\n");
     console();
     s.stop();
