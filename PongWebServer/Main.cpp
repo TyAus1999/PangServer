@@ -22,7 +22,7 @@ u64 getCurrentTimeMS() {
     return out;
 }
 
-void lockMutex(mutex *m) {
+void lockMutex(mutex* m) {
     while (!m->try_lock())
         this_thread::sleep_for(chrono::milliseconds(5));
 }
@@ -46,7 +46,7 @@ int getPlayerIndex(connection_hdl hdl) {
 u64 getUnusedGameID() {
     u64 largestId = 0;
     for (int i = 0; i < games.size(); i++) {
-        if (games[i].gameId > largestId) 
+        if (games[i].gameId > largestId)
             largestId = games[i].gameId;
     }
     largestId++;
@@ -108,7 +108,7 @@ void appendSendAll(string s) {
 }
 
 //Not locked, must lock players vector before using this
-int getIndexOfPlayerId(u64 *playerId, u64 amount, int *indexs) {
+int getIndexOfPlayerId(u64* playerId, u64 amount, int* indexs) {
     int currIndex = 0;
     for (int i = 0; i < players.size(); i++) {
         for (u64 p = 0; p < amount; p++) {
@@ -164,7 +164,7 @@ void leavingClient(connection_hdl hdl) {
                     s.sendData(currentGame->p2.hdl, "e");
                     currentGame->p2.currentGame = 0;
                 }
-                if(gameIndex!=-1 && games.size()>0)
+                if (gameIndex != -1 && games.size() > 0)
                     games.erase(games.begin() + gameIndex);
                 gameMutex.unlock();
             }
@@ -176,7 +176,7 @@ void leavingClient(connection_hdl hdl) {
 }
 void clientMessage(connection_hdl hdl, server::message_ptr msg) {
     string temp = msg->get_payload();
-    cout << "Message from the client: " << temp << endl;
+    //cout << "Message from the client: " << temp << endl;
     int playerIndex = getPlayerIndex(hdl);
     //Might need to make a thread to deal with incoming instead
     //Start a thread when the information comes in and hand off the hdl and the msg pointer
@@ -184,6 +184,7 @@ void clientMessage(connection_hdl hdl, server::message_ptr msg) {
     //split up the command handling from single char commands to multi char commands
     if (temp.size() > 1) {
         if (temp[0] == 'p' && temp[1] != 'a') {//setting the paddle position
+            //cout << temp << endl << endl;
             string x, y;
             int commaIndex = 0;
             for (int i = 1; i < temp.size(); i++) {
@@ -231,7 +232,7 @@ void clientMessage(connection_hdl hdl, server::message_ptr msg) {
         cout << "Sending to Client: " << toClient << endl;
         s.sendData(hdl, toClient);
     }
-    
+
     playerMutex.unlock();
 }
 
@@ -244,7 +245,7 @@ void console() {
         if (s == "stop")break;
         else if (s == "list") {
             lockMutex(&playerMutex);
-            cout << "Total Players: " << players.size() <<endl;
+            cout << "Total Players: " << players.size() << endl;
             for (int i = 0; i < players.size(); i++)
                 cout << "\tPlayer " << players[i].playerId << endl;
             playerMutex.unlock();
@@ -261,16 +262,13 @@ void console() {
 }
 
 bool isTouchingPaddle(paddle* p, ball* b) {
-    double minDistanceX = hPaddleWidth + ballRadius;
-    double minDistanceY = hPaddleHeight + ballRadius;
-    double minusX = abs(p->x - b->x);
-    double minusY = abs(p->y - b->y);
-    if (minusX < minDistanceX) {
-        //we have hit it in the x component
-
-        cout << "MinusY: " << minusY <<"\tMinDistanceY: " << minDistanceY << "\t" << p->y << "\t" << b->y << endl;
-        return true;
+    if (p->x < 0) {//left side
+        
     }
+    else {//right side
+
+    }
+
     return false;
 }
 
@@ -279,8 +277,10 @@ void gameLogic() {
         lockMutex(&gameMutex);
         u64 currentTime = getCurrentTimeMS();
         for (int i = 0; i < games.size(); i++) {
-            ball* currentBall=&games[i].b;
+            ball* currentBall = &games[i].b;
             game* currentGame = &games[i];
+            paddle* p1Paddle = &games[i].p1.p;
+            paddle* p2Paddle = &games[i].p2.p;
             if (currentTime - currentBall->timeOfLastMove > 16) {
                 currentBall->timeOfLastMove = currentTime;
                 currentBall->x += currentBall->xVel;
@@ -288,42 +288,97 @@ void gameLogic() {
 
                 //check for each of the paddles
                 //Paddle origin is centre
-                bool touchingP1 = isTouchingPaddle(&currentGame->p1.p, currentBall);
-                bool touchingP2 = isTouchingPaddle(&currentGame->p2.p, currentBall);
+                bool touchingP1 = isTouchingPaddle(p1Paddle,currentBall);
+                bool touchingP2 = isTouchingPaddle(p2Paddle, currentBall);
+                /*double minusX = abs(currentGame->p1.p.x - currentBall->x);
+                double minusY = abs(currentGame->p1.p.y - currentBall->y);
+                if (minusX < minDistanceX) {
+                    touchingP1 = true;
+                }
+                minusX = abs(currentGame->p2.p.x - currentBall->x);
+                minusY = abs(currentGame->p2.p.y - currentBall->y);
+                if (minusX < minDistanceX) {
+                    cout << "Touching player 2" << endl;
+                    cout << "MinusY: " << minusY << "\tminDistanceY: " << minDistanceY << "\tbool: " << (minusY < minDistanceY) << endl;
+                        touchingP2 = true;
+                }*/
 
                 //check for the bounds
-                if (!touchingP1 && !touchingP2) {
-                    int xTrip = -1;
-                    if (currentBall->x < -16) {//Player 1 Looses round
-                        s.sendData(currentGame->p1.hdl, "w");
-                        s.sendData(currentGame->p2.hdl, "l");
-                        currentBall->y = 0;
-                        currentBall->x = 0;
-                    }
-                    else if (currentBall->x > 16) {//Player 2 looses round
-                        s.sendData(currentGame->p1.hdl, "l");
-                        s.sendData(currentGame->p2.hdl, "w");
-                        currentBall->x = 0;
-                        currentBall->y = 0;
-
-                    }
-
-                    if (currentBall->y < -7) {//Ball hit the ceil
-                        currentBall->y = -7.0;
-                        currentBall->yVel *= -1.0;
-                    }
-                    else if (currentBall->y > 7) {//Ball hit floor
-                        currentBall->y = 7.0;
-                        currentBall->yVel *= -1.0;
-                    }
+                if (currentBall->x < -16) {//Player 1 Looses round
+                    s.sendData(currentGame->p1.hdl, "w");
+                    s.sendData(currentGame->p2.hdl, "l");
+                    currentBall->y = 0;
+                    currentBall->x = 0;
+                    //cout << "Player 1 Loses" << endl;
                 }
-                else if(touchingP1){
+                else if (currentBall->x > 16) {//Player 2 looses round
+                    s.sendData(currentGame->p1.hdl, "l");
+                    s.sendData(currentGame->p2.hdl, "w");
+                    currentBall->x = 0;
+                    currentBall->y = 0;
+                    //cout << "Player 2 Loses" << endl;
+                }
+                else if (currentBall->y < -7) {//Ball hit the ceil
+                    currentBall->y = -7.0;
+                    currentBall->yVel *= -1.0;
+                }
+                else if (currentBall->y > 7) {//Ball hit floor
+                    currentBall->y = 7.0;
+                    currentBall->yVel *= -1.0;
+                }
+                else if (touchingP1 || touchingP2) {
                     currentBall->xVel *= -1;
+                    currentBall->x += currentBall->xVel+(currentBall->xVel*0.1);
+                }
+                //Check for player 1
+                //else if (currentBall->x - ballDiameter - hPaddleWidth < p1Paddle->x) {
+                //    //X is true
+                //    /*cout << "Player 1" << endl;
+                //    currentBall->xVel *= -1;
+                //    currentBall->x += currentBall->xVel;*/
+                //    //Check for Y
+                //    //double subY = currentBall->y - p1Paddle->y;
+                //    //if (subY < 0)
+                //    //    subY *= -1;
+                //    //if (subY > ballDiameter + hPaddleHeight) {
+                //    //    //cout << "Player 1" << endl;
+                //    //    currentBall->xVel *= -1;
+                //    //    currentBall->x += currentBall->xVel;
+                //    //}
+                //    double ballPlus = currentBall->y + ballDiameter;
+                //    double ballMinus = currentBall->y - ballDiameter;
+                //    double paddlePlus = p1Paddle->y + hPaddleHeight;
+                //    double paddleMinus = p1Paddle->y - hPaddleHeight;
+                //    if (ballPlus < paddlePlus || ballMinus < paddlePlus || ballMinus<paddleMinus || ballPlus>paddleMinus) {
+                //        cout << "Hit" << endl;
+                //        currentBall->xVel *= -1;
+                //        currentBall->x += currentBall->xVel+(currentBall->xVel*0.1);
+                //    }
+                //    /*else if (ballPlus < paddlePlus && ballMinus < paddleMinus) {
+                //        cout << "Hit" << endl;
+                //        currentBall->xVel *= -1;
+                //        currentBall->x += currentBall->xVel + (currentBall->xVel * 0.1);
+                //    }*/
 
-                }
-                else if (touchingP2) {
-                    currentBall->xVel *= -1;
-                }
+                //}
+                ////Check for player 2
+                //else if (currentBall->x + ballDiameter + hPaddleWidth > p2Paddle->x) {
+                //    //X is true
+                //    double ballPlus = currentBall->y + ballDiameter;
+                //    double ballMinus = currentBall->y - ballDiameter;
+                //    double paddlePlus = p2Paddle->y + hPaddleHeight;
+                //    double paddleMinus = p2Paddle->y - hPaddleHeight;
+                //    if (ballPlus < paddlePlus || ballMinus < paddlePlus || ballMinus<paddleMinus || ballPlus>paddleMinus) {
+                //        cout << "Hit" << endl;
+                //        currentBall->xVel *= -1;
+                //        currentBall->x += currentBall->xVel + (currentBall->xVel * 0.1);
+                //    }
+                //    /*else if (ballPlus < paddlePlus && ballMinus < paddleMinus) {
+                //        cout << "Hit" << endl;
+                //        currentBall->xVel *= -1;
+                //        currentBall->x += currentBall->xVel + (currentBall->xVel * 0.1);
+                //    }*/
+                //}
 
                 string ballUpdate = "b";
                 ballUpdate.append(to_string(currentBall->x));
@@ -338,7 +393,7 @@ void gameLogic() {
         //This should be it's own thread
         lockMutex(&findGameMutex);
         if (playerIdFindGameQueue.size() > 1) {
-            for (int i = 0; i < playerIdFindGameQueue.size(); i+=2) {
+            for (int i = 0; i < playerIdFindGameQueue.size(); i += 2) {
                 u64 playerIds[2];
                 playerIds[0] = playerIdFindGameQueue[0];
                 playerIds[1] = playerIdFindGameQueue[1];
@@ -352,13 +407,13 @@ void gameLogic() {
                 game toAdd = initGame(players[pIDs[0]], players[pIDs[1]], gameId);
                 players[pIDs[0]].currentGame = gameId;
                 players[pIDs[1]].currentGame = gameId;
-                string toP1="g";
+                string toP1 = "g";
                 toP1.append(to_string(gameId));
                 toP1.append(",");
                 toP1.append(to_string(0));
                 toP1.append(",");
                 toP1.append(to_string(players[pIDs[1]].playerId));
-                string toP2="g";
+                string toP2 = "g";
                 toP2.append(to_string(gameId));
                 toP2.append(",");
                 toP2.append(to_string(1));
@@ -388,5 +443,5 @@ int main() {
     isServerRunning = false;
     incomingThread.join();
     gameLogicThread.join();
-	return 0;
+    return 0;
 }

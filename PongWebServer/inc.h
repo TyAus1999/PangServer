@@ -18,6 +18,8 @@
 #define ballRadius ballDiameter/2.0
 #define hPaddleWidth paddleWidth/2.0
 #define hPaddleHeight paddleHeight/2.0
+#define minDistanceX hPaddleWidth+ballDiameter
+#define minDistanceY hPaddleHeight+ballDiameter
 
 
 
