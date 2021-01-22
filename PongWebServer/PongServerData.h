@@ -6,8 +6,8 @@ typedef unsigned long long u64;
 struct ball {
 	double x;
 	double y;
-	double xVel;
-	double yVel;
+	double xVel;//units per second
+	double yVel;//units per second
 	u64 timeOfLastMove;
 
 

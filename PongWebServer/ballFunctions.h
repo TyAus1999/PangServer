@@ -37,13 +37,13 @@ void setTimeOfArrival(ball* b) {
 
 u64 whenWillBallHitX(ball* b, double x) {
 	double xDistance = b->x - x;
-	double time = xDistance / b->xVel;
+	double time = abs(xDistance / b->xVel);
 	return (u64)time;
 }
 
 u64 whenWillBallHitY(ball* b, double y) {
 	double yDistance = b->y - y;
-	double time = yDistance / b->yVel;
+	double time = abs(yDistance / b->yVel);
 	return (u64)time;
 }
 
@@ -53,17 +53,18 @@ void calculateNextHit(ball* b) {
 	u64 times[2];//intrensic optimization?
 	times[0] = (b->xVel < 0) ? whenWillBallHitX(b, paddleXLeft) : whenWillBallHitX(b, paddleXRight);
 	times[1] = (b->yVel < 0) ? whenWillBallHitY(b, minY) : whenWillBallHitY(b, maxY);
-
 	if (times[0] < times[1]) {
 		//Hit paddle before hit roof or bottom
 		//d=vt
 		b->destY = b->y + (b->yVel * (double)times[0]);
 		b->destX = (b->xVel < 0) ? paddleXLeft : paddleXRight;
+		//printf("Going to hit paddle\n");
 	}
 	else {
 		//Hit top/bottom before paddle
 		b->destX = b->x + (b->xVel * (double)times[1]);
 		b->destY = (b->yVel < 0) ? minY : maxY;
+		//printf("Going to hit top/bottom\n");
 	}
 	setTimeOfArrival(b);
 }
