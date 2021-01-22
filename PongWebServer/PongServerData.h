@@ -4,7 +4,6 @@
 typedef unsigned long long u64;
 
 struct ball {
-	u64 gameId;
 	double x;
 	double y;
 	double xVel;

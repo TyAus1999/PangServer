@@ -273,6 +273,12 @@ int main() {
     isServerRunning = true;
     thread incomingThread([]() {s.run(1666); });
     thread gameLogicThread(gameLogic);
+
+    ball test = initBall();
+    printBall(&test);
+    calculateNextHit(&test);
+    printBall(&test);
+
     printf("Server Is Started\n\n");
     console();
     s.stop();
