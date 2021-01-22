@@ -192,25 +192,25 @@ void gameLogic() {
                     bool touchingP2 = isTouchingPaddle(p2Paddle, currentBall);
 
                     //check for the bounds
-                    if (currentBall->x < -16) {//Player 1 Looses round
+                    if (currentBall->x < minX) {//Player 1 Looses round
                         s.sendData(p1->hdl, "w");
                         s.sendData(p2->hdl, "l");
                         currentBall->y = 0;
                         currentBall->x = 0;
                         //cout << "Player 1 Loses" << endl;
                     }
-                    else if (currentBall->x > 16) {//Player 2 looses round
+                    else if (currentBall->x > maxX) {//Player 2 looses round
                         s.sendData(p1->hdl, "l");
                         s.sendData(p2->hdl, "w");
                         currentBall->x = 0;
                         currentBall->y = 0;
                         //cout << "Player 2 Loses" << endl;
                     }
-                    else if (currentBall->y < -7) {//Ball hit the ceil
+                    else if (currentBall->y < minY) {//Ball hit the ceil
                         currentBall->y = -7.0;
                         currentBall->yVel *= -1.0;
                     }
-                    else if (currentBall->y > 7) {//Ball hit floor
+                    else if (currentBall->y > maxY) {//Ball hit floor
                         currentBall->y = 7.0;
                         currentBall->yVel *= -1.0;
                     }

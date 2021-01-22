@@ -2,6 +2,13 @@
 #define ballDiameter 1.0
 #define paddleWidth 1.0
 #define paddleHeight 6.0
+#define maxX 16.0
+#define minX -16.0
+#define maxY 7.0
+#define minY -7.0
+
+#define paddleXLeft -8.0
+#define paddleXRight 8.0
 
 #define ballRadius ballDiameter/2.0
 #define hPaddleWidth paddleWidth/2.0

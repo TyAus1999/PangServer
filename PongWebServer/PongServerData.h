@@ -9,9 +9,12 @@ struct ball {
 	double y;
 	double xVel;
 	double yVel;
-	double width;
-	double height;
 	u64 timeOfLastMove;
+
+
+	u64 timeOfArrival;
+	double destX;
+	double destY;
 };
 
 struct paddle {
