@@ -5,10 +5,8 @@ using namespace std;
 
 NoTLSServer s;
 
-mutex playerMutex;
+mutex playerGameMutex;
 vector<player> players;
-
-mutex gameMutex;
 vector<game> games;
 
 mutex sendToAllMutex;
@@ -33,50 +31,49 @@ void appendSendAll(string s) {
 
 void incomingClient(connection_hdl hdl) {
     cout << "Client Connected" << endl;
-    lockMutex(&playerMutex);
+    lockMutex(&playerGameMutex);
     player p = initPlayer(hdl, &players);
     players.push_back(p);
-    playerMutex.unlock();
+    playerGameMutex.unlock();
 }
 void leavingClient(connection_hdl hdl) {
     cout << "Client disconected" << endl;
-    lockMutex(&playerMutex);
+    lockMutex(&playerGameMutex);
     for (u64 i = 0; i < players.size(); i++) {
         if (equalHDL(players[i].hdl, hdl)) {
             //Check if player is in a game and then end the game
             //Fix when player leaves vector index error
             player* currentPlayer = &players[i];
             if (currentPlayer->currentGame > 0) {
-                lockMutex(&gameMutex);
                 int gameIndex = getGameIndex(currentPlayer->currentGame, &games);
                 if (gameIndex == -1) {
                     players.erase(players.begin() + i);
-                    gameMutex.unlock();
                     break;
                 }
                 game* currentGame = &games[gameIndex];
-                if (currentPlayer->playerId == currentGame->p2.playerId) {
-                    s.sendData(currentGame->p1.hdl, "e");
-                    currentGame->p1.currentGame = 0;
+                int playerIndexs[2];
+                getPlayerIndexsFromGame(currentGame, &players, playerIndexs);
+                if (currentPlayer->playerId == currentGame->player2Id) {
+                    s.sendData(players[playerIndexs[0]].hdl, "e");
+                    players[playerIndexs[0]].currentGame = 0;
                 }
                 else {
-                    s.sendData(currentGame->p2.hdl, "e");
-                    currentGame->p2.currentGame = 0;
+                    s.sendData(players[playerIndexs[1]].hdl, "e");
+                    players[playerIndexs[1]].currentGame = 0;
                 }
                 if (gameIndex != -1 && games.size() > 0)
                     games.erase(games.begin() + gameIndex);
-                gameMutex.unlock();
             }
             players.erase(players.begin() + i);
             break;
         }
     }
-    playerMutex.unlock();
+    playerGameMutex.unlock();
 }
 void clientMessage(connection_hdl hdl, server::message_ptr msg) {
     string temp = msg->get_payload();
-    cout << "Message from the client: " << temp << endl;
-    lockMutex(&playerMutex);
+    //cout << "Message from the client: " << temp << endl;
+    lockMutex(&playerGameMutex);
     int playerIndex = getPlayerIndex(hdl, &players);
     //Might need to make a thread to deal with incoming instead
     //Start a thread when the information comes in and hand off the hdl and the msg pointer
@@ -95,23 +92,32 @@ void clientMessage(connection_hdl hdl, server::message_ptr msg) {
             }
             x = temp.substr(1, commaIndex - 1);
             y = temp.substr(commaIndex + 1, temp.size());
-            players[playerIndex].p.x = stod(x);
-            players[playerIndex].p.y = stod(y);
+            player* currentPlayer = &players[playerIndex];
+            currentPlayer->p.x = stod(x);
+            currentPlayer->p.y = stod(y);
             //start a thread to send to all the players in the current game this player is in
-            string toOtherPlayers = "p";
-            toOtherPlayers.append(to_string(players[playerIndex].playerId));
-            toOtherPlayers.append(",");
-            toOtherPlayers.append(x);
-            toOtherPlayers.append(",");
-            toOtherPlayers.append(y);
-            for (int i = 0; i < players.size(); i++) {
-                if (i != playerIndex)
-                    s.sendData(players[i].hdl, toOtherPlayers);
+            if (currentPlayer->currentGame > 0) {
+                int gameIndex = getGameIndex(currentPlayer->currentGame, &games);
+                int playerIndexs[2];
+                getPlayerIndexsFromGame(&games[gameIndex], &players, playerIndexs);
+                player* recipient;
+                if (currentPlayer->playerId == players[playerIndexs[0]].playerId)
+                    recipient = &players[playerIndexs[1]];
+                else
+                    recipient = &players[playerIndexs[0]];
+                string toOtherPlayer = "p";
+                toOtherPlayer.append(to_string(currentPlayer->playerId));
+                toOtherPlayer.append(",");
+                toOtherPlayer.append(x);
+                toOtherPlayer.append(",");
+                toOtherPlayer.append(y);
+                s.sendData(recipient->hdl, toOtherPlayer);
             }
         }
     }
     else if (temp == "f") {//find a game
         if (players[playerIndex].currentGame == 0) {
+            printf("Player %llu wants to find a game\n", players[playerIndex].playerId);
             lockMutex(&findGameMutex);
             playerIdFindGameQueue.push_back(players[playerIndex].playerId);
             findGameMutex.unlock();
@@ -130,8 +136,7 @@ void clientMessage(connection_hdl hdl, server::message_ptr msg) {
         cout << "Sending to Client: " << toClient << endl;
         s.sendData(hdl, toClient);
     }
-
-    playerMutex.unlock();
+    playerGameMutex.unlock();
 }
 
 bool isServerRunning = false;
@@ -142,16 +147,16 @@ void console() {
         cin >> s;
         if (s == "stop")break;
         else if (s == "list") {
-            lockMutex(&playerMutex);
+            lockMutex(&playerGameMutex);
             cout << "Total Players: " << players.size() << endl;
             for (int i = 0; i < players.size(); i++)
                 cout << "\tPlayer " << players[i].playerId << endl;
-            playerMutex.unlock();
+            playerGameMutex.unlock();
         }
         else if (s == "games") {
-            lockMutex(&gameMutex);
+            lockMutex(&playerGameMutex);
             cout << "Amount of games: " << games.size() << endl;
-            gameMutex.unlock();
+            playerGameMutex.unlock();
         }
         else {
             cout << "Command not recognized" << endl;
@@ -161,8 +166,7 @@ void console() {
 
 void gameLogic() {
     while (isServerRunning) {
-        lockMutex(&gameMutex);
-        lockMutex(&playerMutex);
+        lockMutex(&playerGameMutex);
         for (int i = 0; i < games.size(); i++) {
             u64 currentTime = getCurrentTimeMS();
             ball* currentBall = &games[i].b;
@@ -175,8 +179,8 @@ void gameLogic() {
                 pIds[0] = currentGame->player1Id;
                 pIds[1] = currentGame->player2Id;
                 int playerIndexs[2];
-                int amount = getIndexOfPlayerId(pIds, 2, playerIndexs, &players);
-                if (amount == 2) {
+                getPlayerIndexsFromGame(currentGame, &players, playerIndexs);
+                if (playerIndexs[0] > -1 && playerIndexs[1] > -1) {
                     u64 currentTime = getCurrentTimeMS();
                     player* p1=&players[playerIndexs[0]];
                     player* p2=&players[playerIndexs[1]];
@@ -184,20 +188,20 @@ void gameLogic() {
                     paddle* p2Paddle = &p2->p;
                     //check for each of the paddles
                     //Paddle origin is centre
-                    bool touchingP1 = isTouchingPaddle(p1Paddle, currentBall);
+                    bool touchingP1 = isTouchingPaddle(p1Paddle, currentBall);//Can be optimized
                     bool touchingP2 = isTouchingPaddle(p2Paddle, currentBall);
 
                     //check for the bounds
                     if (currentBall->x < -16) {//Player 1 Looses round
-                        s.sendData(currentGame->p1.hdl, "w");
-                        s.sendData(currentGame->p2.hdl, "l");
+                        s.sendData(p1->hdl, "w");
+                        s.sendData(p2->hdl, "l");
                         currentBall->y = 0;
                         currentBall->x = 0;
                         //cout << "Player 1 Loses" << endl;
                     }
                     else if (currentBall->x > 16) {//Player 2 looses round
-                        s.sendData(currentGame->p1.hdl, "l");
-                        s.sendData(currentGame->p2.hdl, "w");
+                        s.sendData(p1->hdl, "l");
+                        s.sendData(p2->hdl, "w");
                         currentBall->x = 0;
                         currentBall->y = 0;
                         //cout << "Player 2 Loses" << endl;
@@ -223,8 +227,7 @@ void gameLogic() {
                 }
             }
         }
-        playerMutex.unlock();
-        gameMutex.unlock();
+        playerGameMutex.unlock();
 
         //This should be it's own thread
         lockMutex(&findGameMutex);
@@ -235,8 +238,7 @@ void gameLogic() {
                 playerIds[1] = playerIdFindGameQueue[1];
                 playerIdFindGameQueue.erase(playerIdFindGameQueue.begin(), playerIdFindGameQueue.begin() + 2);
                 int pIDs[2];
-                lockMutex(&playerMutex);
-                lockMutex(&gameMutex);
+                lockMutex(&playerGameMutex);
                 int written = getIndexOfPlayerId(playerIds, 2, pIDs, &players);
                 //cout << "Written: " << written << endl;
                 u64 gameId = getUnusedGameId(&games);
@@ -258,8 +260,7 @@ void gameLogic() {
                 s.sendData(players[pIDs[0]].hdl, toP1);
                 s.sendData(players[pIDs[1]].hdl, toP2);
                 games.push_back(toAdd);
-                gameMutex.unlock();
-                playerMutex.unlock();
+                playerGameMutex.unlock();
             }
         }
         findGameMutex.unlock();

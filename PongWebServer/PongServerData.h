@@ -31,10 +31,6 @@ struct player {
 
 struct game {
 	u64 gameId;
-	player p1;
-	player p2;
-	paddle* p1Paddle;
-	paddle* p2Paddle;
 	u64 player1Id;
 	u64 player2Id;
 	ball b;

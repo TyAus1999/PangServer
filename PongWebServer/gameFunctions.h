@@ -9,8 +9,6 @@ game initGame(player* p1, player* p2, u64 gameId) {
 	p2->p.x = 8.0;
 	p2->p.y = 0.0;
 	out.gameId = gameId;
-	out.p1Paddle = &p1->p;
-	out.p2Paddle = &p2->p;
 	out.player1Id = p1->playerId;
 	out.player2Id = p2->playerId;
 	out.b = initBall();
@@ -35,4 +33,22 @@ u64 getUnusedGameId(vector<game>*games) {
 	}
 	largestId++;
 	return largestId;
+}
+
+//indexs is a pointer to an int array of size 2
+//indexs[0] is player 1, indexs[1] is player 2
+void getPlayerIndexsFromGame(game* g, vector<player>* players, int* indexs) {
+	indexs[0] = -1;
+	indexs[1] = -1;
+	for (int i = 0; i < players->size(); i++) {
+		u64 workingPlayerId = players->at(i).playerId;
+		if (g->player1Id == workingPlayerId) {
+			indexs[0] = i;
+		}
+		else if (g->player2Id == workingPlayerId) {
+			indexs[1] = i;
+		}
+		else if (indexs[0] > -1 && indexs[1] > -1)
+			break;
+	}
 }
