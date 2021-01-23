@@ -171,61 +171,132 @@ void gameLogic() {
             u64 currentTime = getCurrentTimeMS();
             ball* currentBall = &games[i].b;
             game* currentGame = &games[i];
-            if (currentTime - currentBall->timeOfLastMove > 16) {
-                currentBall->timeOfLastMove = currentTime;
-                currentBall->x += currentBall->xVel;
-                currentBall->y += currentBall->yVel;
-                u64 pIds[2];
-                pIds[0] = currentGame->player1Id;
-                pIds[1] = currentGame->player2Id;
-                int playerIndexs[2];
-                getPlayerIndexsFromGame(currentGame, &players, playerIndexs);
-                if (playerIndexs[0] > -1 && playerIndexs[1] > -1) {
-                    u64 currentTime = getCurrentTimeMS();
-                    player* p1=&players[playerIndexs[0]];
-                    player* p2=&players[playerIndexs[1]];
-                    paddle* p1Paddle = &p1->p;
-                    paddle* p2Paddle = &p2->p;
-                    //check for each of the paddles
-                    //Paddle origin is centre
-                    bool touchingP1 = isTouchingPaddle(p1Paddle, currentBall);//Can be optimized
-                    bool touchingP2 = isTouchingPaddle(p2Paddle, currentBall);
-
-                    //check for the bounds
-                    if (currentBall->x < minX) {//Player 1 Looses round
-                        s.sendData(p1->hdl, "w");
-                        s.sendData(p2->hdl, "l");
-                        currentBall->y = 0;
-                        currentBall->x = 0;
-                        //cout << "Player 1 Loses" << endl;
-                    }
-                    else if (currentBall->x > maxX) {//Player 2 looses round
-                        s.sendData(p1->hdl, "l");
-                        s.sendData(p2->hdl, "w");
-                        currentBall->x = 0;
-                        currentBall->y = 0;
-                        //cout << "Player 2 Loses" << endl;
-                    }
-                    else if (currentBall->y < minY) {//Ball hit the ceil
-                        currentBall->y = -7.0;
-                        currentBall->yVel *= -1.0;
-                    }
-                    else if (currentBall->y > maxY) {//Ball hit floor
-                        currentBall->y = 7.0;
-                        currentBall->yVel *= -1.0;
-                    }
-                    else if (touchingP1 || touchingP2) {
-                        currentBall->xVel *= -1;
-                        currentBall->x += currentBall->xVel + (currentBall->xVel * 0.1);
-                    }
-                    string ballUpdate = "b";
-                    ballUpdate.append(to_string(currentBall->x));
-                    ballUpdate.append(",");
-                    ballUpdate.append(to_string(currentBall->y));
-                    s.sendData(p1->hdl, ballUpdate);
-                    s.sendData(p2->hdl, ballUpdate);
+            if (currentBall->timeOfArrival > currentTime) {
+                //means the ball is where it needs to be
+                currentBall->x = currentBall->destX;
+                currentBall->y = currentBall->destY;
+                int pIndexs[2];
+                getPlayerIndexsFromGame(currentGame, &players, pIndexs);
+                player* p1 = &players[pIndexs[0]];
+                player* p2 = &players[pIndexs[1]];
+                paddle* p1Paddle = &p1->p;
+                paddle* p2Paddle = &p2->p;
+                //check for paddle hit first
+                if (p1Paddle->x + minDistanceX == currentBall->x) {
+                    //Hit left paddle
+                    currentBall->xVel *= -1;
+                    calculateNextHit(currentBall, currentTime);
+                    string toSend = makeBallString(currentBall);
+                    s.sendData(p1->hdl, toSend);
+                    s.sendData(p2->hdl, toSend);
                 }
+                else if (p2Paddle->x - minDistanceX == currentBall->x) {
+                    //Hit right paddle
+                    currentBall->xVel *= -1;
+                    calculateNextHit(currentBall, currentTime);
+                    string toSend = makeBallString(currentBall);
+                    s.sendData(p1->hdl, toSend);
+                    s.sendData(p2->hdl, toSend);
+                }
+                //Checking for top/bottom collision
+                else if (currentBall->y-ballDiameter==minY) {
+                    //Hit floor
+                    currentBall->yVel *= -1;
+                    calculateNextHit(currentBall, currentTime);
+                    string toSend = makeBallString(currentBall);
+                    s.sendData(p1->hdl, toSend);
+                    s.sendData(p2->hdl, toSend);
+                }
+                else if (currentBall->y + ballDiameter == maxY) {
+                    //Hit top
+                    currentBall->yVel *= -1;
+                    calculateNextHit(currentBall, currentTime);
+                    string toSend = makeBallString(currentBall);
+                    s.sendData(p1->hdl, toSend);
+                    s.sendData(p2->hdl, toSend);
+                }
+                //Need to add the check for the bounds
+                else if (currentBall->x + ballDiameter == minX) {
+                    //Hit left wall
+                    currentBall->xVel *= -1;
+                    currentBall->x = 0;
+                    currentBall->y = 0;
+                    s.sendData(p1->hdl, "w");
+                    s.sendData(p2->hdl, "l");
+                    calculateNextHit(currentBall, currentTime);
+                    string toSend = makeBallString(currentBall);
+                    s.sendData(p1->hdl, toSend);
+                    s.sendData(p2->hdl, toSend);
+                }
+                else if (currentBall->x - ballDiameter == maxX) {
+                    //hit right wall
+                    currentBall->xVel *= -1;
+                    currentBall->x = 0;
+                    currentBall->y = 0;
+                    s.sendData(p1->hdl, "l");
+                    s.sendData(p2->hdl, "w");
+                    calculateNextHit(currentBall, currentTime);
+                    string toSend = makeBallString(currentBall);
+                    s.sendData(p1->hdl, toSend);
+                    s.sendData(p2->hdl, toSend);
+                }
+                printBall(currentBall);
             }
+            //if (currentTime - currentBall->timeOfLastMove > 16) {
+            //    currentBall->timeOfLastMove = currentTime;
+            //    currentBall->x += currentBall->xVel;
+            //    currentBall->y += currentBall->yVel;
+            //    u64 pIds[2];
+            //    pIds[0] = currentGame->player1Id;
+            //    pIds[1] = currentGame->player2Id;
+            //    int playerIndexs[2];
+            //    getPlayerIndexsFromGame(currentGame, &players, playerIndexs);
+            //    if (playerIndexs[0] > -1 && playerIndexs[1] > -1) {
+            //        u64 currentTime = getCurrentTimeMS();
+            //        player* p1=&players[playerIndexs[0]];
+            //        player* p2=&players[playerIndexs[1]];
+            //        paddle* p1Paddle = &p1->p;
+            //        paddle* p2Paddle = &p2->p;
+            //        //check for each of the paddles
+            //        //Paddle origin is centre
+            //        bool touchingP1 = isTouchingPaddle(p1Paddle, currentBall);//Can be optimized
+            //        bool touchingP2 = isTouchingPaddle(p2Paddle, currentBall);
+
+            //        //check for the bounds
+            //        if (currentBall->x < minX) {//Player 1 Looses round
+            //            s.sendData(p1->hdl, "w");
+            //            s.sendData(p2->hdl, "l");
+            //            currentBall->y = 0;
+            //            currentBall->x = 0;
+            //            //cout << "Player 1 Loses" << endl;
+            //        }
+            //        else if (currentBall->x > maxX) {//Player 2 looses round
+            //            s.sendData(p1->hdl, "l");
+            //            s.sendData(p2->hdl, "w");
+            //            currentBall->x = 0;
+            //            currentBall->y = 0;
+            //            //cout << "Player 2 Loses" << endl;
+            //        }
+            //        else if (currentBall->y < minY) {//Ball hit the ceil
+            //            currentBall->y = -7.0;
+            //            currentBall->yVel *= -1.0;
+            //        }
+            //        else if (currentBall->y > maxY) {//Ball hit floor
+            //            currentBall->y = 7.0;
+            //            currentBall->yVel *= -1.0;
+            //        }
+            //        else if (touchingP1 || touchingP2) {
+            //            currentBall->xVel *= -1;
+            //            currentBall->x += currentBall->xVel + (currentBall->xVel * 0.1);
+            //        }
+            //        string ballUpdate = "b";
+            //        ballUpdate.append(to_string(currentBall->x));
+            //        ballUpdate.append(",");
+            //        ballUpdate.append(to_string(currentBall->y));
+            //        s.sendData(p1->hdl, ballUpdate);
+            //        s.sendData(p2->hdl, ballUpdate);
+            //    }
+            //}
         }
         playerGameMutex.unlock();
 
@@ -260,6 +331,10 @@ void gameLogic() {
                 s.sendData(players[pIDs[0]].hdl, toP1);
                 s.sendData(players[pIDs[1]].hdl, toP2);
                 games.push_back(toAdd);
+
+                string ballString = makeBallString(&games.back().b);
+                s.sendData(players[pIDs[0]].hdl, ballString);
+                s.sendData(players[pIDs[1]].hdl, ballString);
                 playerGameMutex.unlock();
             }
         }

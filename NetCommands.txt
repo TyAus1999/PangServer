@@ -48,6 +48,8 @@ To Client:
         l
             The current player looses
             
-
+        z x, y, xVel, yVel, timeOfCompletion
+        z0,0,0.1,0.2,1256738282342
+            Tells the client where the ball is and where it is going and at what time it will reach the destination
         
     

@@ -72,7 +72,6 @@ public:
     void sendData(connection_hdl hdl, string payload) {
         websocketpp::lib::error_code ec;
         m_server.send(hdl, payload, websocketpp::frame::opcode::text, ec);
-        
     }
 
     server::connection_ptr getConnection(connection_hdl hdl) {

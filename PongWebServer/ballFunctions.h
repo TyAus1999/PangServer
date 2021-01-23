@@ -1,6 +1,6 @@
 #pragma once
 #include "inc.h"
-
+void calculateNextHit(ball* b, u64 currentTime);
 ball initBall() {
 	ball b;
 	memset(&b, 0, sizeof(ball));
@@ -13,7 +13,7 @@ ball initBall() {
 			break;
 	}
 	b.timeOfLastMove = getCurrentTimeMS();
-
+	calculateNextHit(&b, getCurrentTimeMS());
 	return b;
 }
 
@@ -26,7 +26,7 @@ double pythag(double x, double y) {
 
 void setTimeOfArrival(ball* b) {
 	//d=vt
-	double actualVelocity=pythag(b->xVel,b->yVel);
+	double actualVelocity=pythag(b->xVel,b->yVel)/1000.0;
 	double distanceX = b->destX - b->x;
 	double distanceY = b->destY - b->y;
 	double actualDistance = pythag(distanceX, distanceY);
@@ -37,36 +37,43 @@ void setTimeOfArrival(ball* b) {
 
 u64 whenWillBallHitX(ball* b, double x) {
 	double xDistance = b->x - x;
-	double time = abs(xDistance / b->xVel);
+	double time = abs(xDistance / (b->xVel/1000.0));
 	return (u64)time;
 }
 
 u64 whenWillBallHitY(ball* b, double y) {
 	double yDistance = b->y - y;
-	double time = abs(yDistance / b->yVel);
+	double time = abs(yDistance / (b->yVel/1000.0));
 	return (u64)time;
 }
 
-void calculateNextHit(ball* b) {
+void calculateNextHit(ball* b, u64 currentTime) {
 	//0 is paddle x
 	//1 is top/bottom
-	u64 times[2];//intrensic optimization?
-	times[0] = (b->xVel < 0) ? whenWillBallHitX(b, paddleXLeft) : whenWillBallHitX(b, paddleXRight);
-	times[1] = (b->yVel < 0) ? whenWillBallHitY(b, minY) : whenWillBallHitY(b, maxY);
-	if (times[0] < times[1]) {
+	u64 times[3];//intrensic optimization?
+	times[0] = (b->xVel < 0) ? whenWillBallHitX(b, paddleXLeft) : whenWillBallHitX(b, paddleXRight);//Paddles
+	times[1] = (b->yVel < 0) ? whenWillBallHitY(b, minY) : whenWillBallHitY(b, maxY);//Top down
+	times[2] = (b->xVel < 0) ? whenWillBallHitX(b, minX) : whenWillBallHitX(b, maxX);//Left right
+	if (times[0] < times[1] && times[0] < times[2]) {
 		//Hit paddle before hit roof or bottom
 		//d=vt
-		b->destY = b->y + (b->yVel * (double)times[0]);
-		b->destX = (b->xVel < 0) ? paddleXLeft : paddleXRight;
+		b->destY = b->y + ((b->yVel / 1000.0) * (double)times[0]);
+		b->destX = (b->xVel < 0) ? paddleXLeft + minDistanceX : paddleXRight - minDistanceX;
 		//printf("Going to hit paddle\n");
 	}
-	else {
+	else if (times[1] < times[0] && times[1] < times[2]) {
 		//Hit top/bottom before paddle
-		b->destX = b->x + (b->xVel * (double)times[1]);
-		b->destY = (b->yVel < 0) ? minY : maxY;
+		b->destX = b->x + ((b->xVel/1000.0) * (double)times[1]);
+		b->destY = (b->yVel < 0) ? minY+ballDiameter : maxY-ballDiameter;
 		//printf("Going to hit top/bottom\n");
 	}
+	else if (times[2] < times[0] && times[2] < times[1]) {
+		//Hit left right bounds
+		b->destX = (b->xVel < 0) ? minX + minDistanceX : maxX - minDistanceX;
+		b->destY = b->y + ((b->yVel / 1000.0) * (double)times[2]);
+	}
 	setTimeOfArrival(b);
+	b->timeOfArrival += currentTime;
 }
 
 void printBall(ball* b) {
@@ -77,4 +84,18 @@ void printBall(ball* b) {
 	printf("\tTime Of Arrival: %llu\n", b->timeOfArrival);
 	printf("\tdestX: %llf\n\tdestY: %llf\n", b->destX, b->destY);
 	printf("%s\n", space);
+}
+
+string makeBallString(ball* b) {
+	string out = "z";
+	out.append(to_string(b->x));
+	out.append(",");
+	out.append(to_string(b->y));
+	out.append(",");
+	out.append(to_string(b->xVel));
+	out.append(",");
+	out.append(to_string(b->yVel));
+	out.append(",");
+	out.append(to_string(b->timeOfArrival));
+	return out;
 }
