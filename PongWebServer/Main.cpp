@@ -179,7 +179,7 @@ void gameLogic() {
         for (int i = 0; i < games.size(); i++) {
             ball* currentBall = &games[i].b;
             game* currentGame = &games[i];
-            if (currentBall->timeOfArrival > currentTime) {
+            if (currentBall->timeOfArrival < currentTime) {
                 //means the ball is where it needs to be
                 currentBall->x = currentBall->destX;
                 currentBall->y = currentBall->destY;
@@ -249,10 +249,10 @@ void gameLogic() {
                     s.sendData(p1->hdl, toSend);
                     s.sendData(p2->hdl, toSend);
                 }
-                printBall(currentBall);
-                printf("Current Time of Arrival: %llu\n", currentBall->timeOfArrival);
-                printf("Current Time: %llu\n", currentTime);
-                printf("TOA-CT=%llu", currentBall->timeOfArrival - currentTime);
+                //printBall(currentBall);
+                //printf("Current Time of Arrival: %llu\n", currentBall->timeOfArrival);
+                //printf("Current Time: %llu\n", currentTime);
+                //printf("TOA-CT=%llu\n\n", currentBall->timeOfArrival - currentTime);
             }
             //if (currentTime - currentBall->timeOfLastMove > 16) {
             //    currentBall->timeOfLastMove = currentTime;
