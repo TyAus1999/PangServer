@@ -39,11 +39,17 @@ void incomingClient(connection_hdl hdl) {
 void leavingClient(connection_hdl hdl) {
     cout << "Client disconected" << endl;
     lockMutex(&playerGameMutex);
+    lockMutex(&findGameMutex);
     for (u64 i = 0; i < players.size(); i++) {
         if (equalHDL(players[i].hdl, hdl)) {
             //Check if player is in a game and then end the game
             //Fix when player leaves vector index error
             player* currentPlayer = &players[i];
+            for (int pIndexTemp = 0; pIndexTemp < playerIdFindGameQueue.size(); pIndexTemp++) {
+                if (currentPlayer->playerId == playerIdFindGameQueue[pIndexTemp]) {
+                    playerIdFindGameQueue.erase(playerIdFindGameQueue.begin() + pIndexTemp);
+                }
+            }
             if (currentPlayer->currentGame > 0) {
                 int gameIndex = getGameIndex(currentPlayer->currentGame, &games);
                 if (gameIndex == -1) {
@@ -68,7 +74,9 @@ void leavingClient(connection_hdl hdl) {
             break;
         }
     }
+    findGameMutex.unlock();
     playerGameMutex.unlock();
+    
 }
 void clientMessage(connection_hdl hdl, server::message_ptr msg) {
     string temp = msg->get_payload();
@@ -167,14 +175,15 @@ void console() {
 void gameLogic() {
     while (isServerRunning) {
         lockMutex(&playerGameMutex);
+        u64 currentTime = getCurrentTimeMS();
         for (int i = 0; i < games.size(); i++) {
-            u64 currentTime = getCurrentTimeMS();
             ball* currentBall = &games[i].b;
             game* currentGame = &games[i];
             if (currentBall->timeOfArrival > currentTime) {
                 //means the ball is where it needs to be
                 currentBall->x = currentBall->destX;
                 currentBall->y = currentBall->destY;
+                printf("Prev Time of Arrival: %llu\n", currentBall->timeOfArrival);
                 int pIndexs[2];
                 getPlayerIndexsFromGame(currentGame, &players, pIndexs);
                 player* p1 = &players[pIndexs[0]];
@@ -241,6 +250,9 @@ void gameLogic() {
                     s.sendData(p2->hdl, toSend);
                 }
                 printBall(currentBall);
+                printf("Current Time of Arrival: %llu\n", currentBall->timeOfArrival);
+                printf("Current Time: %llu\n", currentTime);
+                printf("TOA-CT=%llu", currentBall->timeOfArrival - currentTime);
             }
             //if (currentTime - currentBall->timeOfLastMove > 16) {
             //    currentBall->timeOfLastMove = currentTime;
