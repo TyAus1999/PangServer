@@ -183,7 +183,7 @@ void gameLogic() {
                 //means the ball is where it needs to be
                 currentBall->x = currentBall->destX;
                 currentBall->y = currentBall->destY;
-                printf("Prev Time of Arrival: %llu\n", currentBall->timeOfArrival);
+                //printf("Prev Time of Arrival: %llu\n", currentBall->timeOfArrival);
                 int pIndexs[2];
                 getPlayerIndexsFromGame(currentGame, &players, pIndexs);
                 player* p1 = &players[pIndexs[0]];
@@ -191,7 +191,7 @@ void gameLogic() {
                 paddle* p1Paddle = &p1->p;
                 paddle* p2Paddle = &p2->p;
                 //check for paddle hit first
-                if (p1Paddle->x + minDistanceX == currentBall->x) {
+                if (p1Paddle->x + minDistanceX >= currentBall->x) {
                     //Hit left paddle
                     currentBall->xVel *= -1;
                     calculateNextHit(currentBall, currentTime);
@@ -199,7 +199,7 @@ void gameLogic() {
                     s.sendData(p1->hdl, toSend);
                     s.sendData(p2->hdl, toSend);
                 }
-                else if (p2Paddle->x - minDistanceX == currentBall->x) {
+                else if (p2Paddle->x - minDistanceX <= currentBall->x) {
                     //Hit right paddle
                     currentBall->xVel *= -1;
                     calculateNextHit(currentBall, currentTime);
